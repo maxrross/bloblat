@@ -24,8 +24,13 @@ const faceMaterial = new THREE.MeshBasicMaterial({
 });
 const face = new THREE.Mesh(faceGeometry, faceMaterial);
 face.position.set(0, 0.5, 1);
-blob.add(face);
+blob.position.y = -2
 scene.add(blob);
+face.position.x = blob.position.x;
+face.position.y = blob.position.y + 0.5;
+face.position.z = blob.position.z + 1;
+scene.add(face);
+
 
 
 const floorGeometry = new THREE.PlaneGeometry(100, 100);
@@ -105,11 +110,13 @@ function animate() {
   requestAnimationFrame(animate);
 
   if (moving) {
+    face.position.x = blob.position.x;
+    face.position.y = blob.position.y + 1;  // adjust the offset as needed
+    face.position.z = blob.position.z + .5;
     let raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(mouse, camera);
 
     let intersects = raycaster.intersectObject(floor);
-
     if (intersects.length > 0) {
       targetPosition = intersects[0].point;
       distanceToTravel = blob.position.distanceTo(targetPosition);
