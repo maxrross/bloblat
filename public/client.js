@@ -7,8 +7,9 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   1000
 );
-camera.position.z = 20;
-camera.position.y = -10;
+camera.position.z = 10;
+camera.position.y = -20;
+let gravityDirection = new THREE.Vector3();
 
 
 const renderer = new THREE.WebGLRenderer();
@@ -33,13 +34,13 @@ const eye1 = new THREE.Mesh(
   new THREE.SphereGeometry(0.1, 16, 16),
   new THREE.MeshBasicMaterial({ color: 0x000000 })
 );
-eye1.position.set(0.2, 0.2, 0.9);
+eye1.position.set(0.2, 0.2, 0.5);
 face.add(eye1);
 const eye2 = new THREE.Mesh(
   new THREE.SphereGeometry(0.1, 16, 16),
   new THREE.MeshBasicMaterial({ color: 0x000000 })
 );
-eye2.position.set(-0.2, 0.2, 0.9);
+eye2.position.set(-0.2, 0.2, 0.5);
 face.add(eye2);
 // Create a quadratic bezier curve for the mouth
 const smileCurve = new THREE.Shape();
@@ -56,15 +57,8 @@ smile.position.set(0, 0.2, 1.1); // Position on the face, adjust as needed
 
 
 face.position.set(0, 0.5, 1);
-blob.position.y = -2;
-scene.add(blob);
-face.position.x = blob.position.x;
-face.position.y = blob.position.y + 0.5;
-face.position.z = blob.position.z + 1;
-scene.add(face);
-face.add(camera);
 
-const floorGeometry = new THREE.BoxGeometry(100, 2, 100);
+const floorGeometry = new THREE.BoxGeometry(100, 100, 100);
 const floorMaterial = new THREE.MeshBasicMaterial({
   color: 0xffffff,
   map: new THREE.TextureLoader().load("ice.jpg"),
@@ -74,11 +68,33 @@ floor.rotation.x = Math.PI / -2;
 floor.position.y = -1;
 scene.add(floor);
 
+blob.position.z = 50;
+scene.add(blob);
+
+face.position.x = blob.position.x;
+face.position.y = blob.position.y + 0.5;
+face.position.z = blob.position.z + 1;
+scene.add(face);
+face.add(camera);
+
+
+
+const loader = new THREE.CubeTextureLoader();
+const texture = loader.load([
+  'corona_ft.png',
+  'corona_bk.png',
+  'corona_up.png',
+  'corona_dn.png',
+  'corona_rt.png',
+  'corona_lf.png',
+]);
+scene.background = texture;
+
 let mouse = new THREE.Vector2();
 let direction = new THREE.Vector3();
 let moving = false;
 let targetPosition = new THREE.Vector3();
-let rollSpeed = 0.05;
+let rollSpeed = 0.2;
 let distanceToTravel = 0;
 let distanceTraveled = 0;
 
@@ -86,7 +102,7 @@ let chatSprites = [];
 let trailParticles = [];
 
 function createTrail() {
-  const trailGeometry = new THREE.SphereGeometry(0.1, 16, 16); // Smaller sphere for the trail particle
+  const trailGeometry = new THREE.SphereGeometry(.75, 16, 16); // Smaller sphere for the trail particle
   const trailParticle = new THREE.Mesh(trailGeometry, slimeMaterial);
   trailParticle.position.copy(blob.position);
   scene.add(trailParticle);
@@ -111,11 +127,12 @@ function createTextSprite(message) {
   const context = canvas.getContext("2d");
 
   // measure the text width
+  context.font = "24px";
   const textWidth = context.measureText(message).width;
 
   // Set the canvas width and height to fit the text and padding
   canvas.width = textWidth + padding * 2;
-  canvas.height = 24 + padding * 2 + arrowHeight;
+  canvas.height = 8 + padding * 2 + arrowHeight;
 
   // Draw the background rectangle
   context.fillStyle = "white";
@@ -143,10 +160,10 @@ function createTextSprite(message) {
   });
   const sprite = new THREE.Sprite(material);
 
-  sprite.scale.set(canvas.width / 100, canvas.height / 100, 1);
+  sprite.scale.set(canvas.width/15, canvas.height/15, 1);
 
   // Place the sprite above the blob
-  sprite.position.set(blob.position.x, blob.position.y + 2, blob.position.z);
+  sprite.position.set(blob.position.x, blob.position.y + 2, blob.position.z + 5);
 
   chatSprites.push(sprite);
 
@@ -154,31 +171,37 @@ function createTextSprite(message) {
 }
 function bounceOffEdges() {
   // Edges of the rectangle
-  const minX = -500, maxX = 500;
-  const minZ = -500, maxZ = 500;
-
-  // Check for collision with each edge and bounce if necessary
-  if (blob.position.x <= minX || blob.position.x >= maxX) {
-    direction.x = -direction.x;  // Invert x direction
-  }
-  if (blob.position.z <= minZ || blob.position.z >= maxZ) {
-    direction.z = -direction.z;  // Invert z direction
-  }
+  // const minX = -55, maxX = 55;
+  const minZ = 50, maxZ = 50;
+  const minY = -48.5, maxY = 48.5;
+  const minX = -48.5, maxX = 48.5;
 
   // Ensure the blob stays within the rectangle
   blob.position.x = THREE.MathUtils.clamp(blob.position.x, minX, maxX);
   blob.position.z = THREE.MathUtils.clamp(blob.position.z, minZ, maxZ);
+  blob.position.y = THREE.MathUtils.clamp(blob.position.y, minY, maxY);
 }
+
 function animate() {
   requestAnimationFrame(animate);
+
   camera.lookAt(blob.position);
+  for (let { particle, time } of trailParticles) {
+    // Calculate the distance from the blob
+    let distance = blob.position.distanceTo(particle.position);
+
+    // Determine scale based on distance
+    let scale = Math.max(0.05, 1 / (distance * 0.1 + 1)); // This will create larger particles near the blob and smaller particles farther away.
+                                                           // Minimum size is set to 0.05 to ensure the particles are always visible
+
+    // Update particle scale
+    particle.scale.set(scale, scale, scale);
+  }
+  
   if (moving) {
     face.position.x = blob.position.x;
-    face.position.y = blob.position.y +.5; // adjust the offset as needed
+    face.position.y = blob.position.y -.5; // adjust the offset as needed
     face.position.z = blob.position.z +.75;
-    // eye1.position.set(0.2, 0.2, 0.9);
-    // eye2.position.set(-0.2, 0.2, 0.9);
-
     let raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(mouse, camera);
     createTrail();
@@ -193,6 +216,7 @@ function animate() {
       }
       return true;
     });
+
     let intersects = raycaster.intersectObject(floor);
     if (intersects.length > 0) {
       targetPosition = intersects[0].point;
@@ -201,13 +225,13 @@ function animate() {
       direction.subVectors(targetPosition, blob.position).normalize();
     }
 
-    let moveDistance = rollSpeed * distanceToTravel;
+    let moveDistance = rollSpeed ;
 
     blob.position.addScaledVector(direction, moveDistance);
     blob.rotation.x += direction.y * rollSpeed;
     blob.rotation.z += direction.x * rollSpeed;
 
-    distanceTraveled += moveDistance;
+    // distanceTraveled += moveDistance;
 
     if (distanceTraveled >= distanceToTravel) {
       moving = false;
@@ -217,7 +241,7 @@ function animate() {
 
   // Update the position of each chat sprite to follow the blob
   for (let sprite of chatSprites) {
-    sprite.position.set(blob.position.x, blob.position.y + 2, blob.position.z);
+    sprite.position.set(blob.position.x, blob.position.y + 5, blob.position.z+2);
   }
 
   renderer.render(scene, camera);
